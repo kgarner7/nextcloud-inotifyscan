@@ -84,8 +84,14 @@ def parse_environ():
   else:
     docker = False
     occ = require_environ('NEXTCLOUD_HOME') + '/occ'
+
+  if os.environ.get('EXTERNAL_STORAGE') == 'True':
+    external_storage = True
+  else:
+    external_storage = None
+
   return Instance(interval=interval, occ=occ, users=(user,),
-                  external_storage=None, docker=docker,
+                  external_storage=external_storage, docker=docker,
                   php='php')
 
 def parse_args():

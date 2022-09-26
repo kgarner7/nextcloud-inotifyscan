@@ -1,0 +1,10 @@
+.git
+.github
+tests
+
+.dockerignore
+LICENSE
+makefile
+pylintrc
+README.md
+sample.ini
