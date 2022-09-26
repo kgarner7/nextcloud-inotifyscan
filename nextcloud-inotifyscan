@@ -22,8 +22,8 @@ logging.basicConfig(format='%(levelname)s - %(message)s')
 _logger = logging.getLogger()
 
 Instance = collections.namedtuple(
-    'Instance', 'interval occ users external_storage docker php')
-Folder = collections.namedtuple('Folder', 'occ_cmd path_prefix data_prefix')
+    'Instance', 'interval occ users external_storage docker php excludes')
+Folder = collections.namedtuple('Folder', 'occ_cmd path_prefix data_prefix excludes')
 Task = collections.namedtuple('Task', 'occ_cmd paths')
 
 class EnvironNotFound(Exception):
@@ -62,8 +62,12 @@ def parse_config(config_file):
         if len(docker) != 2:
           _logger.warning('docker must be specified as `username:container`')
           continue
+
+      excludes = config.get(section, 'exclude', fallback=r'/\.')
+
       yield Instance(interval=interval, occ=occ, users=users,
-                     external_storage=external_storage, docker=docker, php=php)
+                     external_storage=external_storage, docker=docker, php=php,
+                     excludes=excludes)
     except configparser.Error as e:
       _logger.warning('config error: %s', e)
 
@@ -90,9 +94,11 @@ def parse_environ():
   else:
     external_storage = None
 
+  excludes = os.environ.get('EXCLUDE', r'/\.')
+
   return Instance(interval=interval, occ=occ, users=(user,),
                   external_storage=external_storage, docker=docker,
-                  php='php')
+                  php='php', excludes=excludes)
 
 def parse_args():
   """Parse commandline arguments and yield Instance objects.
@@ -164,7 +170,7 @@ def watch_instances(instances):
       path_prefix = '/'+user+'/files'
       data_prefix = data_dir+path_prefix
       folders.append(Folder(occ_cmd=occ_cmd, path_prefix=path_prefix,
-                            data_prefix=data_prefix))
+                            data_prefix=data_prefix, excludes=instance.excludes))
     if instance.external_storage:
       _logger.debug('external storage scan is enabled for Nextcloud at %s',
                     os.path.dirname(instance.occ))
@@ -202,7 +208,7 @@ def watch_instances(instances):
           path_prefix = '/'+user+'/files'+storage['mount_point'].rstrip('/')
           data_prefix = storage['configuration']['datadir'].rstrip('/')
           folders.append(Folder(occ_cmd=occ_cmd, path_prefix=path_prefix,
-                                data_prefix=data_prefix))
+                                data_prefix=data_prefix, excludes=instance.excludes))
   workers = tuple(map(watch, folders))
   min_interval = min(instance.interval for instance in instances)
   while True:
@@ -223,7 +229,7 @@ def watch(folder):
   data_prefix_len = len(data_prefix)
   scan_paths = set()
   inotifywait_proc = subprocess.Popen(
-      ['inotifywait', '--event=create,modify,move,delete', r'--exclude=/\.',
+      ['inotifywait', '--event=create,modify,move,delete', "--exclude",folder.excludes,
        '--recursive', '--quiet', '--format=%e/%f%w/', '--monitor',
        os.path.abspath(data_prefix)],   # relative path won't work
       stdout=subprocess.PIPE, bufsize=0)
