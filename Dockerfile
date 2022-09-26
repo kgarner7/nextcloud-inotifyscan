@@ -12,4 +12,4 @@ RUN apk add inotify-tools python3 && \
 USER www-data
 VOLUME /var/www/html
 
-CMD ["python3", "/app/nextcloud-inotifyscan"]
+CMD ["python3", "/app/nextcloud-inotifyscan", "-q"]
